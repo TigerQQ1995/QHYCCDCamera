@@ -297,6 +297,7 @@ namespace SdkDemo08
             //debayer
             ASCOM.QHYCCD.libqhyccd.SetQHYCCDDebayerOnOff(camhandle, true);
             rawArray = new byte[length * 4];
+
             //获取照片的信息
             //Obtain information on the photos
             while (true)
