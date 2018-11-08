@@ -33,8 +33,8 @@ namespace SdkDemo08
         int s;
         int index;
         Byte pixData;
-        string path = "C:\\Users\\tang\\Desktop\\image";//文件夹路径用于保存图像数据
-        string path_live = "C:\\Users\\tang\\Desktop\\avi";
+        string path = "F:\\emgucv\\tym1104\\QHYCCDCamera\\image";//文件夹路径用于保存图像数据
+        string path_live = "F:\\emgucv\\tym1104\\QHYCCDCamera\\avi";
         uint length;
 
         public Form1()
