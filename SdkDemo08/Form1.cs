@@ -33,17 +33,23 @@ namespace SdkDemo08
         int s;
         int index;
         Byte pixData;
-        string path = "C:\\Users\\tang\\Desktop\\image";//文件夹路径用于保存图像数据
-        string path_live = "C:\\Users\\tang\\Desktop\\avi";
+        //文件夹路径用于保存图像数据
+        string path = "C:\\Users\\tang\\Desktop\\image";
         uint length;
+        private Thread t;
 
         public Form1()
         {
             InitializeComponent();
+            Control.CheckForIllegalCrossThreadCalls = false;
         }
 
         
-
+        /// <summary>
+        /// 连续模式连接按键
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void ConnectLive_Click(object sender, EventArgs e)
         {
             //如果目前相机没有连接，执行以下方法连接相机
@@ -85,7 +91,7 @@ namespace SdkDemo08
                 length = ASCOM.QHYCCD.libqhyccd.GetQHYCCDMemLength(camhandle);
                 //将照片所占用的空间大小放入byte数组中
                 //Put pictures occupied space in a byte array
-                rawArray = new byte[length * 4];
+                rawArray = new byte[length];
 
 
 
@@ -97,11 +103,7 @@ namespace SdkDemo08
                 //Connect whether value is changed to 1, says it has connections
                 isConnect = 1;
 
-                //连接成功后，根据Path创建文件夹                
-                if (Directory.Exists(path_live) == false)
-                {//判断目录是否存在
-                    Directory.CreateDirectory(path_live);
-                }
+                
 
             }
             else
@@ -148,7 +150,7 @@ namespace SdkDemo08
                 ASCOM.QHYCCD.libqhyccd.SetQHYCCDBinMode(camhandle, 1, 1);
                 //设置相机分辨率
                 //set resolution
-                ASCOM.QHYCCD.libqhyccd.SetQHYCCDResolution(camhandle, 0, 0, x, h);
+                ASCOM.QHYCCD.libqhyccd.SetQHYCCDResolution(camhandle, 0, 0, 800, 600);
                 //获取照片所占用的空间大小
                 //To get photos occupied space size
                 length = ASCOM.QHYCCD.libqhyccd.GetQHYCCDMemLength(camhandle);
@@ -187,6 +189,8 @@ namespace SdkDemo08
             //If there is a camera connection, perform the following method
             if (isConnect == 1)
             {
+                //关闭连续模式
+                ASCOM.QHYCCD.libqhyccd.StopQHYCCDLive(camhandle);
                 //关闭相机
                 //close camera
                 ASCOM.QHYCCD.libqhyccd.CloseQHYCCD(camhandle);
@@ -212,17 +216,25 @@ namespace SdkDemo08
 
         private void setting_Click(object sender, EventArgs e)
         {
-            uint ret;
+            uint ret1, ret2;
             //从控件上取下对应设置的值
             //The value of the corresponding set below is taken from the controls
             double exposure_times = Convert.ToDouble(exposure.Text);
             double gain_num = Convert.ToDouble(gain.Text);
             double offfset_num = Convert.ToDouble(offset.Text);
             double usbTraffic_num = Convert.ToDouble(usbTraffic.Text);
+            x = Convert.ToUInt32(width.Text);
+            h = Convert.ToUInt32(height.Text);
+            uint x_num = Convert.ToUInt32(pointX.Text);
+            uint y_num = Convert.ToUInt32(pointY.Text);
+
+            //设置分辨率
+            ret1 = ASCOM.QHYCCD.libqhyccd.SetQHYCCDResolution(camhandle, x_num, y_num, x, h);
+
             //设置参数
             //set param
-            ret = setCameraParam(camhandle, exposure_times, gain_num, offfset_num, usbTraffic_num);
-            if (ret == 0)
+            ret2 = setCameraParam(camhandle, exposure_times, gain_num, offfset_num, usbTraffic_num);
+            if (ret1 == 0 && ret2 ==0)
             {
                 //如果设置成功，弹出提示框
                 //If set to succeed, pop-up prompts
@@ -282,38 +294,34 @@ namespace SdkDemo08
 
         }
 
-
-        private void Live_Click(object sender, EventArgs e)
+        private void ShowImage()
         {
-            //设置相机的图片位数
-            //set camare bits mode
-            ASCOM.QHYCCD.libqhyccd.SetQHYCCDBitsMode(camhandle, 8);
+            //计算帧率
             uint ret = 1;
-            ASCOM.QHYCCD.libqhyccd.InitQHYCCD(camhandle);
-            //开启曝光
-            //exposure
-            //ASCOM.QHYCCD.libqhyccd.ExpQHYCCDSingleFrame(camhandle);
-            ASCOM.QHYCCD.libqhyccd.BeginQHYCCDLive(camhandle);
-            //debayer
-            ASCOM.QHYCCD.libqhyccd.SetQHYCCDDebayerOnOff(camhandle, true);
-            rawArray = new byte[length * 4];
+            int frames = 0;
+            int fps = 0;
+            int t_interval = 0;
+            DateTime t_start, t_end;
+            TimeSpan ts;
+            t_start = DateTime.Now;
+            int num = 0;
 
-            //获取照片的信息
-            //Obtain information on the photos
             while (true)
             {
+                bitmap = new Bitmap((int)x, (int)h);
                 while (ret != 0)
                 {
                     ret = ASCOM.QHYCCD.libqhyccd.C_GetQHYCCDLiveFrame(camhandle, ref x, ref h, ref bpp, ref c, rawArray);
-                }
 
+                }
                 //Console.WriteLine("x = {0} h = {1} bpp = {2} c = {3}", x,h,bpp,c);
+
                 //显示图片 内存法  
                 if (ret == 0)
                 {
                     ret = 1;
 
-                    bitmap = new Bitmap((int)x, (int)h);
+
                     rectangle = new Rectangle(0, 0, (int)x, (int)h);
                     bmpData = bitmap.LockBits(rectangle, ImageLockMode.ReadWrite, bitmap.PixelFormat);
                     //Console.WriteLine("rectangle = {0} ReadWrite = {1} PixelFormat = {2}",rectangle,ImageLockMode.ReadWrite,bitmap.PixelFormat);
@@ -327,13 +335,46 @@ namespace SdkDemo08
                     {
                         for (int y = 0; y < x; y++)
                         {
-                            rgbArray[s] = rawArray[index + 1];
-                            rgbArray[s + 1] = rawArray[index + 1];
-                            rgbArray[s + 2] = rawArray[index + 1];
-                            rgbArray[s + 3] = 255;
+                            if (bpp == 16 && c == 3)
+                            {
+                                rgbArray[s] = rawArray[index + 1];
+                                rgbArray[s + 1] = rawArray[index + 3];
+                                rgbArray[s + 2] = rawArray[index + 5];
+                                rgbArray[s + 3] = 255;
 
-                            s += 4;
-                            index += 2;
+                                s += 4;
+                                index += 6;
+                            }
+                            else if (bpp == 16 && c == 1)
+                            {
+                                rgbArray[s] = rawArray[index + 1];
+                                rgbArray[s + 1] = rawArray[index + 1];
+                                rgbArray[s + 2] = rawArray[index + 1];
+                                rgbArray[s + 3] = 255;
+
+                                s += 4;
+                                index += 2;
+                            }
+                            else if (bpp == 8 && c == 3)
+                            {
+                                rgbArray[s] = rawArray[index];
+                                rgbArray[s + 1] = rawArray[index + 1];
+                                rgbArray[s + 2] = rawArray[index + 2];
+                                rgbArray[s + 3] = 255;
+
+                                s += 4;
+                                index += 3;
+                            }
+                            else if (bpp == 8 && c == 1)
+                            {
+                                rgbArray[s] = rawArray[index];
+                                rgbArray[s + 1] = rawArray[index];
+                                rgbArray[s + 2] = rawArray[index];
+                                rgbArray[s + 3] = 255;
+
+                                s += 4;
+                                index += 1;
+                            }
                         }
                     }
 
@@ -342,8 +383,68 @@ namespace SdkDemo08
                     bitmap.UnlockBits(bmpData);
 
                     pictureBox1.Image = bitmap;
+
                 }
+
+                frames++;
+
+
+
+
+                t_end = DateTime.Now;
+                ts = t_end.Subtract(t_start);
+                t_interval += ts.Milliseconds;
+                if (t_interval >= 2 * 1000)
+                {
+                    num++;
+                    fps = 1000 * frames / t_interval;
+                    fps_text.Text = "" + fps;
+                    //Console.WriteLine(frames);
+                    //Console.WriteLine("fps:{0}", fps);
+                    //Console.WriteLine();
+                    
+                    frames = 0;
+                    t_interval = 0;
+                }
+
+                if (num == 10)
+                {
+                    time.Text = "" + DateTime.Now;
+                    //Console.WriteLine(DateTime.Now);
+                    num = 0;
+
+                }
+
+
+
+                t_start = DateTime.Now;
+
+                //ret = 1;
             }
+
+
+            //Application.DoEvents();
+        }
+        private void Live_Click(object sender, EventArgs e)
+        {
+            //设置相机的图片位数
+            //set camare bits mode
+            ASCOM.QHYCCD.libqhyccd.SetQHYCCDBitsMode(camhandle, 16);
+            uint ret = 1;
+            ASCOM.QHYCCD.libqhyccd.InitQHYCCD(camhandle);
+            //开启曝光
+            //exposure            
+            ASCOM.QHYCCD.libqhyccd.BeginQHYCCDLive(camhandle);
+            //debayer
+            ASCOM.QHYCCD.libqhyccd.SetQHYCCDDebayerOnOff(camhandle, true);
+            rawArray = new byte[length * 2];
+
+            //ASCOM.QHYCCD.libqhyccd.SetQHYCCDResolution(camhandle, 0, 0, 800, 600);
+
+            //将循环获取图像放在一个线程中
+            t = new Thread(new ThreadStart(ShowImage));
+            t.Start();
+                                   
 
         }
 
@@ -384,7 +485,7 @@ namespace SdkDemo08
                 {
                     for (int y = 0; y < x; y++)
                     {
-                        rgbArray[s ] = rawArray[index+1];
+                        rgbArray[s ] = rawArray[index + 1];
                         rgbArray[s + 1] = rawArray[index + 3];
                         rgbArray[s + 2] = rawArray[index + 5];
                         rgbArray[s + 3] = 255;
@@ -525,6 +626,52 @@ namespace SdkDemo08
             }
             string fileName = "img_gray_" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".png";//给照片文件命名
             bitmap.Save(path + "\\" + fileName);//保存照片
+        }
+
+        private void cfw1_Click(object sender, EventArgs e)
+        {
+            ASCOM.QHYCCD.libqhyccd.SendOrder2QHYCCDCFW(camhandle, "0", 1);
+            uint t;
+            for (int i = 0; i < 50; i++)
+            {
+                t = (uint)ASCOM.QHYCCD.libqhyccd.GetQHYCCDParam(camhandle, CONTROL_ID.CONTROL_CFWPORT);
+                Console.WriteLine("i = {0} t = {1}", i, t);
+                Application.DoEvents();
+            }
+        }
+
+        private void cfw2_Click(object sender, EventArgs e)
+        {
+            ASCOM.QHYCCD.libqhyccd.SendOrder2QHYCCDCFW(camhandle, "1", 1);
+            uint t;
+            for (int i = 0; i < 50; i++)
+            {
+                t = (uint)ASCOM.QHYCCD.libqhyccd.GetQHYCCDParam(camhandle, CONTROL_ID.CONTROL_CFWPORT);
+                Console.WriteLine("i = {0} t = {1}", i, t);
+                Application.DoEvents();
+            }
+        }
+
+        private void cfw3_Click(object sender, EventArgs e)
+        {
+            ASCOM.QHYCCD.libqhyccd.SendOrder2QHYCCDCFW(camhandle, "2", 1);
+            uint t;
+            for (int i = 0; i < 50; i++)
+            {
+                t = (uint)ASCOM.QHYCCD.libqhyccd.GetQHYCCDParam(camhandle, CONTROL_ID.CONTROL_CFWPORT);
+                Console.WriteLine("i = {0} t = {1}", i, t);
+                Application.DoEvents();
+            }
+        }
+
+        private void cfw4_Click(object sender, EventArgs e)
+        {
+            ASCOM.QHYCCD.libqhyccd.SendOrder2QHYCCDCFW(camhandle, "3", 1);
+        }
+
+        private void cfw5_Click(object sender, EventArgs e)
+        {
+            ASCOM.QHYCCD.libqhyccd.SendOrder2QHYCCDCFW(camhandle, "4", 1);
         }
     }
 }
@@ -762,6 +909,11 @@ namespace SdkDemo08
             [DllImport("qhyccd.dll", EntryPoint = "SetQHYCCDDebayerOnOff",
              CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
             public unsafe static extern UInt32 SetQHYCCDDebayerOnOff(IntPtr handle,bool onoff);
+
+            [DllImport("qhyccd.dll", EntryPoint = "StopQHYCCDLive",
+            CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+            public unsafe static extern UInt32 StopQHYCCDLive(IntPtr handle);
+
         }
     }
 
